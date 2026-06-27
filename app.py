@@ -17,7 +17,7 @@ from database import (
 from yolo_detector import GeminiDetector
 from draw_boxes import draw_annotations
 from crop_utils import crop_detected_objects
-from embedder import generate_embedding
+from clip_embedder import generate_embedding
 
 # --- Setup ---
 st.set_page_config(
