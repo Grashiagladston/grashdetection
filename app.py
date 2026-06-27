@@ -14,7 +14,7 @@ from database import (
     clear_all_history, 
     find_similar_images
 )
-from gemini_detector import GeminiDetector
+from yolo_detector import GeminiDetector
 from draw_boxes import draw_annotations
 from crop_utils import crop_detected_objects
 from embedder import generate_embedding
