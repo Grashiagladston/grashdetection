@@ -8,11 +8,11 @@ import uuid
 # Imports
 import config
 from database import (
-    init_db, 
-    save_embeddings_only,  # NEW: Only saves ID + embeddings
-    get_history_records, 
-    clear_all_history, 
-    find_similar_imagess
+    init_db,
+    save_embeddings_only,
+    get_history_records,
+    clear_all_history,
+    find_similar_images
 )
 from yolo_detector import GeminiDetector
 from draw_boxes import draw_annotations
