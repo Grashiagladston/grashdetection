@@ -39,6 +39,8 @@ def _load_model():
 # ============================================================
 
 def generate_embedding(pil_image):
+    print("TEST EMBEDDING CALLED")
+    return [0.0] * 512
 
     """
     Generate a normalized CLIP embedding.
