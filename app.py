@@ -12,7 +12,7 @@ from database import (
     save_embeddings_only,  # NEW: Only saves ID + embeddings
     get_history_records, 
     clear_all_history, 
-    find_similar_images
+    find_similar_imagess
 )
 from yolo_detector import GeminiDetector
 from draw_boxes import draw_annotations
