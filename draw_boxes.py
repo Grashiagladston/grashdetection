@@ -39,7 +39,6 @@ def draw_annotations(image, detections, target_object):
             "box_2d": obj.box_2d
         })
 
-        # YOLO already returns PIXELS
         left = xmin
         top = ymin
         right = xmax
