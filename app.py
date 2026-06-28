@@ -12,7 +12,7 @@ from database import (
     save_embeddings_only,
     get_history_records,
     clear_all_history,
-    find_similar_images
+    find_similar_images  # Fixed: singular
 )
 from yolo_detector import GeminiDetector
 from draw_boxes import draw_annotations
@@ -33,7 +33,10 @@ except Exception as e:
     st.error(f"Database Connection Failed. Check `config.py`. Error: {e}")
     st.stop()
 
-detector = GeminiDetector()
+# Lazy load detector to prevent Render 504 timeout on startup
+@st.cache_resource
+def get_detector():
+    return GeminiDetector()
 
 # --- Comprehensive Styling (Same as before) ---
 st.markdown("""
@@ -358,12 +361,10 @@ section[data-testid="stSidebar"] .stTextInput > div > div > input:focus {
     border: 1px solid var(--border-accent) !important;
 }
 
-/* Hide uploaded file thumbnail preview */
 [data-testid="stFileUploader"] [data-testid="stImage"] {
     display: none !important;
 }
 
-/* Custom ID display styling */
 .id-display {
     background: var(--bg-dark);
     border: 2px solid var(--border-accent);
@@ -386,7 +387,6 @@ section[data-testid="stSidebar"] .stTextInput > div > div > input:focus {
     font-weight: 700;
 }
 
-/* Duplicate warning box */
 .duplicate-warning-box {
     background: rgba(255, 82, 82, 0.08);
     border: 2px solid rgba(255, 82, 82, 0.3);
@@ -410,7 +410,6 @@ section[data-testid="stSidebar"] .stTextInput > div > div > input:focus {
     font-size: 0.9rem;
 }
 
-/* New image success box */
 .new-image-success-box {
     background: rgba(0, 230, 118, 0.08);
     border: 2px solid rgba(0, 230, 118, 0.3);
@@ -435,7 +434,6 @@ section[data-testid="stSidebar"] .stTextInput > div > div > input:focus {
     margin-top: 0.25rem;
 }
 
-/* Crop grid */
 .crop-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -467,7 +465,6 @@ section[data-testid="stSidebar"] .stTextInput > div > div > input:focus {
     text-align: center;
 }
 
-/* Embedding section */
 .embedding-section {
     background: var(--bg-card);
     border: 1px solid var(--border);
@@ -544,6 +541,9 @@ with tab_hub:
         if st.button("🔍  Process Image", use_container_width=True):
             with st.spinner("Analyzing image..."):
                 try:
+                    # Load model lazily to prevent 504 gateway timeout
+                    detector = get_detector()
+                    
                     # Step 1: Generate embedding for the uploaded image
                     uploaded_embedding = generate_embedding(image)
                     
@@ -552,14 +552,11 @@ with tab_hub:
                     
                     # =============================================
                     # DUPLICATE DETECTED (≥85% similarity)
-                    # Return ONLY: Image ID + Embeddings
-                    # NO IMAGES SHOWN
                     # =============================================
                     if similar_runs:
                         for (db_row, similarity) in similar_runs:
                             run_id, ts, name, target, count, db_emb = db_row
                             
-                            # Warning box - NO IMAGE
                             st.markdown(f"""
                             <div class="duplicate-warning-box">
                                 <div class="warning-icon">⚠️</div>
@@ -570,7 +567,6 @@ with tab_hub:
                             
                             st.error("🚫 Duplicate image detected. No image will be displayed as per policy.")
                             
-                            # === IMAGE ID ONLY ===
                             st.markdown("""
                             <div class="id-display">
                                 <div class="id-label">Matched Image ID</div>
@@ -580,7 +576,6 @@ with tab_hub:
                             
                             st.markdown("---")
                             
-                            # === UPLOADED IMAGE EMBEDDING ===
                             up_dims = len(uploaded_embedding) if uploaded_embedding else 0
                             st.markdown(f"**📤 Uploaded Image Embedding** <span class='info-badge'>{up_dims} dims</span>", unsafe_allow_html=True)
                             
@@ -593,9 +588,7 @@ with tab_hub:
                             
                             st.markdown("---")
                             
-                            # === STORED (MATCHED) EMBEDDING ONLY ===
                             if db_emb:
-                                # Parse embedding from database
                                 if isinstance(db_emb, str):
                                     try:
                                         db_emb_list = [float(x) for x in db_emb.strip("[]").split(",") if x.strip()]
@@ -624,19 +617,13 @@ with tab_hub:
                     
                     # =============================================
                     # NEW IMAGE (No duplicate found)
-                    # SHOW: Cropped images + Embeddings
-                    # STORE: ONLY ID + Embeddings (NO IMAGES)
                     # =============================================
-                    
-                    # Generate unique ID for this image
                     image_id = str(uuid.uuid4())[:8].upper()
                     
-                    # Run detection
                     detections = detector.detect(image, target_object)
                     annotated_image, target_count, boxes_list = draw_annotations(image, detections, target_object)
                     crops_data = crop_detected_objects(image, detections, target_object)
                     
-                    # Generate embeddings for each crop
                     crop_embeddings = []
                     for crop_item in crops_data:
                         crop_emb = generate_embedding(crop_item['image'])
@@ -645,7 +632,6 @@ with tab_hub:
                             'embedding': crop_emb
                         })
                     
-                    # SUCCESS BOX - NEW IMAGE
                     st.markdown(f"""
                     <div class="new-image-success-box">
                         <div class="success-icon">✅</div>
@@ -656,7 +642,6 @@ with tab_hub:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # === DISPLAY IMAGE ID ===
                     st.markdown(f"""
                     <div class="id-display">
                         <div class="id-label">Generated Image ID</div>
@@ -664,7 +649,6 @@ with tab_hub:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # === DISPLAY CROPPED IMAGES (First Try - In Memory Only) ===
                     if crops_data:
                         st.markdown(f"""
                         <div style="margin-top: 1.5rem; margin-bottom: 0.75rem;">
@@ -684,7 +668,6 @@ with tab_hub:
                     else:
                         st.info("No crops generated from this image.")
                     
-                    # === DISPLAY FULL IMAGE EMBEDDING ===
                     st.markdown("---")
                     st.markdown("""
                     <div class="embedding-section">
@@ -705,7 +688,6 @@ with tab_hub:
                         with st.expander("👁️ View Full Image Vector"):
                             st.code(str(list(uploaded_embedding)), language="json")
                     
-                    # === DISPLAY CROP EMBEDDINGS ===
                     if crop_embeddings:
                         st.markdown("---")
                         st.markdown("""
@@ -734,8 +716,6 @@ with tab_hub:
                             if i < len(crop_embeddings) - 1:
                                 st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
                     
-                    # === SAVE TO DATABASE - ONLY ID + EMBEDDINGS ===
-                    # NO IMAGE DATA IS STORED
                     save_embeddings_only(
                         image_id=image_id,
                         original_image_name=uploaded_file.name,
@@ -753,7 +733,7 @@ with tab_hub:
                     import traceback
                     st.code(traceback.format_exc())
 
-# --- Tab 2: Embedding History (No Images) ---
+# --- Tab 2: Embedding History ---
 with tab_history:
     history = get_history_records()
     
@@ -784,7 +764,6 @@ with tab_history:
             
             with st.expander(f"  🆔 {run_id}  |  {ts}  |  Target: {target}  |  Count: {count}"):
                 
-                # Show ID prominently
                 st.markdown(f"""
                 <div class="id-display">
                     <div class="id-label">Image ID</div>
@@ -792,7 +771,6 @@ with tab_history:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Show metadata
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.markdown(f"**Filename:** `{name}`")
@@ -803,7 +781,6 @@ with tab_history:
                 
                 st.markdown("<div class='section-divider'></div>", unsafe_allow_html=True)
                 
-                # Show Full Image Embedding
                 if full_emb:
                     emb_preview = ", ".join(f"{x:.4f}" for x in full_emb[:8]) + ", ..."
                     st.markdown(f"""
@@ -819,7 +796,6 @@ with tab_history:
                     with st.expander("👁️ View Full Image Vector"):
                         st.code(str(full_emb), language="json")
                 
-                # Show Crop Embeddings (if any)
                 if crop_embs:
                     st.markdown("<div class='section-divider'></div>", unsafe_allow_html=True)
                     st.markdown("**📦 Crop Embeddings:**")
@@ -840,7 +816,6 @@ with tab_history:
                             with st.expander(f"View Full Vector - {label}"):
                                 st.code(str(emb), language="json")
                 
-                # No image warning
                 st.markdown("<div class='section-divider'></div>", unsafe_allow_html=True)
                 st.info("🔒 No image data stored. Only ID and embeddings are available.")
         
