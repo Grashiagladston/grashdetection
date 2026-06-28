@@ -61,7 +61,6 @@ def init_db():
     cur = conn.cursor()
     
     try:
-        # Detection runs table - using FLOAT[]
         cur.execute("""
             CREATE TABLE IF NOT EXISTS detection_runs (
                 image_id VARCHAR(50) PRIMARY KEY,
@@ -73,7 +72,6 @@ def init_db():
             );
         """)
         
-        # Crop embeddings table - using FLOAT[]
         cur.execute("""
             CREATE TABLE IF NOT EXISTS crop_embeddings (
                 id SERIAL PRIMARY KEY,
@@ -103,11 +101,9 @@ def calculate_cosine_similarity(emb1, emb2):
     if emb1 is None or emb2 is None:
         return 0.0
     
-    # Convert database arrays to numpy arrays
     a = np.array(emb1, dtype=np.float64)
     b = np.array(emb2, dtype=np.float64)
     
-    # Calculate cosine similarity
     dot_product = np.dot(a, b)
     norm_a = np.linalg.norm(a)
     norm_b = np.linalg.norm(b)
@@ -161,7 +157,6 @@ def find_similar_images(embedding, threshold=0.85):
     cur = conn.cursor()
     
     try:
-        # Fetch ALL embeddings from database
         cur.execute("""
             SELECT image_id, timestamp, original_image_name, target_object, 
                    detected_count, full_image_embedding
@@ -171,21 +166,15 @@ def find_similar_images(embedding, threshold=0.85):
         all_rows = cur.fetchall()
         results = []
         
-        # Calculate similarity in Python
         for row in all_rows:
-            db_emb = row[5] # full_image_embedding is at index 5
+            db_emb = row[5]
             if db_emb:
                 similarity = calculate_cosine_similarity(embedding, db_emb)
-                
-                # Check if it meets the threshold
                 if similarity >= threshold:
                     db_row = (row[0], row[1], row[2], row[3], row[4], row[5])
                     results.append((db_row, similarity))
         
-        # Sort by highest similarity first
         results.sort(key=lambda x: x[1], reverse=True)
-        
-        # Return top 5 matches
         return results[:5]
         
     except Exception as e:
